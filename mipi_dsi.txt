@@ -1,0 +1,141 @@
+1¡¢
+
+extern uint32_t ckt_read_check_current_id(struct mipi_panel_info *mipi);
+uint32_t mdss_dsi_read_panel_signature(struct mipi_panel_info *mipi)
+{
+	//uint32_t rec_buf[1];
+	//uint32_t *lp = rec_buf, data;
+	uint32_t ret = response_value;
+/*	uint32_t panel_signature = mipi->signature;
+
+#if (DISPLAY_TYPE_MDSS == 1)
+	if (ret && ret != panel_signature)
+		goto exit_read_signature;
+
+	ret = mdss_dsi_cmds_tx(mipi, &read_ddb_start_cmd, 1, mipi->broadcast);
+	if (ret)
+		goto exit_read_signature;
+	if (!mdss_dsi_cmds_rx(mipi, &lp, 1, 1))
+		goto exit_read_signature;
+
+	data = ntohl(*lp);
+	data = data >> 8;
+	response_value = data;
+	if (response_value != panel_signature)
+		ret = response_value;
+
+exit_read_signature:
+	// Keep the non detectable panel at the end and set panel signature 0xFFFF 
+	if ((panel_signature == 0) || (panel_signature == 0xFFFF))
+		ret = 0;
+#endif
+*/
+	ret = ckt_read_check_current_id(mipi);
+	return ret;
+}
+
+
+
+2¡¢
+
+uint32_t ckt_read_check_current_id(struct mipi_panel_info *mipi)
+{
+	uint32_t ret=1;
+	uint32_t panel_signature = mipi->signature;
+	
+	dprintf(CRITICAL,"%s panel_signature 0x%x\n", __func__, panel_signature);
+
+	if(panel_signature == RM67191_1080P_CMD_SIGNATURE)
+	{
+		ret = mipi_rm67191_1080p_read_check_id(mipi);
+	}
+	else if(panel_signature == RM67191TXD_1080P_CMD_SIGNATURE)
+	{
+		ret = mipi_rm67191txd_1080p_read_check_id(mipi);
+	}
+	else if(panel_signature == RM67196_1080P_CMD_SIGNATURE)
+	{
+		ret = 0;
+	}
+
+	return ret;
+}
+
+
+3¡¢
+
+
+/****************************************************************/
+//set return size
+static char rm67191txd_1080p_read_dcs_set_return_package_one_size_cmd[4] = {0x01, 0x00, 0x37, 0x80 };	/* DTYPE_DCS_READ */
+static struct mipi_dsi_cmd rm67191txd_1080p_read_dcs_set_return_package_one_size =
+	{sizeof(rm67191txd_1080p_read_dcs_set_return_package_one_size_cmd), rm67191txd_1080p_read_dcs_set_return_package_one_size_cmd,0x00};
+
+
+
+//rm67191 switch page 0
+static char rm67191txd_1080p_mipi_first_package_cmd[12] ={0x02, 0x00, 0x39, 0xc0,0xFE,0x00,
+};
+
+
+static struct mipi_dsi_cmd rm67191txd_1080p_mipi_first_package = 
+									{sizeof(rm67191txd_1080p_mipi_first_package_cmd),rm67191txd_1080p_mipi_first_package_cmd,0x00};
+
+//rm67191 read reg cmd
+
+static char rm67191txd_1080p_mipi_read_0xDA_cmd[4] ={0xDA, 0x00, 0x06, 0xA0};	
+static struct mipi_dsi_cmd rm67191txd_1080p_mipi_read_0xDA = 
+	{sizeof(rm67191txd_1080p_mipi_read_0xDA_cmd),rm67191txd_1080p_mipi_read_0xDA_cmd,0x00};
+
+static char rm67191txd_1080p_mipi_read_0xDB_cmd[4] ={0xDB, 0x00, 0x06, 0xA0};	
+static struct mipi_dsi_cmd rm67191txd_1080p_mipi_read_0xDB = 
+	{sizeof(rm67191txd_1080p_mipi_read_0xDB_cmd),rm67191txd_1080p_mipi_read_0xDB_cmd,0x00};
+
+static char rm67191txd_1080p_mipi_read_0xDC_cmd[4] ={0xDC, 0x00, 0x06, 0xA0};	
+static struct mipi_dsi_cmd rm67191txd_1080p_mipi_read_0xDC = 
+	{sizeof(rm67191txd_1080p_mipi_read_0xDC_cmd),rm67191txd_1080p_mipi_read_0xDC_cmd,0x00};
+
+
+
+//return 0: matching success  1:matching fail
+static uint32_t mipi_rm67191txd_1080p_read_check_id(struct mipi_panel_info *mipi)
+{
+	uint32_t rec_buf[24];
+	uint32_t *rp = rec_buf;
+	uint32_t data,device_id;
+    uint32_t panel_signature = mipi->signature;
+	
+	mdss_dsi_cmds_tx(mipi, &rm67191txd_1080p_mipi_first_package, 1, 0);
+	mdss_dsi_cmds_tx(mipi, &rm67191txd_1080p_read_dcs_set_return_package_one_size, 1, 0);
+
+	
+
+	memset(rec_buf, 0, sizeof(rec_buf));
+	mdss_dsi_cmds_tx(mipi, &rm67191txd_1080p_mipi_read_0xDA, 1, 0);
+	mdss_dsi_cmds_rx(mipi, &rp, 1, 1);
+	device_id = (*rp>>8)&0xff;
+
+	memset(rec_buf, 0, sizeof(rec_buf));
+	mdss_dsi_cmds_tx(mipi, &rm67191txd_1080p_mipi_read_0xDB, 1, 0);
+	mdss_dsi_cmds_rx(mipi, &rp, 1, 1);
+	data = (*rp>>8)&0xff;
+	device_id = (device_id<<8)|data;
+
+	memset(rec_buf, 0, sizeof(rec_buf));
+	mdss_dsi_cmds_tx(mipi, &rm67191txd_1080p_mipi_read_0xDC, 1, 0);
+	mdss_dsi_cmds_rx(mipi, &rp, 1, 1);
+	data = (*rp>>8)&0xff;
+	device_id = (device_id<<8)|data;
+	
+	dprintf(CRITICAL, "[%s]device id=0x%x,signature=0x%x\n",__FUNCTION__,device_id, panel_signature);
+
+	
+	if(panel_signature == device_id)
+	{
+		return 0;
+	}
+
+	return 1;
+}
+
+#define RM67191TXD_1080P_CMD_SIGNATURE    0x328000
